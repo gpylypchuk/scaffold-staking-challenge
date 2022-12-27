@@ -4,6 +4,8 @@ const { solidity } = require("ethereum-waffle");
 
 use(solidity);
 
+const ETH_WHALE = "0x6daB3bCbFb336b29d06B9C793AEF7eaA57888922";
+
 // Utilities methods
 const increaseWorldTimeInSeconds = async (seconds, mine = false) => {
   await ethers.provider.send("evm_increaseTime", [seconds]);
@@ -15,7 +17,7 @@ const increaseWorldTimeInSeconds = async (seconds, mine = false) => {
 describe("Staker dApp", () => {
   let owner;
   let addr1;
-  let addr2;
+  let whale;
   let addrs;
 
   let stakerContract;
@@ -23,6 +25,13 @@ describe("Staker dApp", () => {
   let ExampleExternalContractFactory;
 
   beforeEach(async () => {
+    await network.provider.request({
+      method: "hardhat_impersonateAccount",
+      params: [ETH_WHALE],
+    });
+
+    whale = await ethers.getSigner(ETH_WHALE);
+
     // Deploy ExampleExternalContract contract
     ExampleExternalContractFactory = await ethers.getContractFactory(
       "ExampleExternalContract"
@@ -36,7 +45,7 @@ describe("Staker dApp", () => {
     );
 
     // eslint-disable-next-line no-unused-vars
-    [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
+    [owner, addr1, whale, ...addrs] = await ethers.getSigners();
   });
 
   describe("Test contract utils methods", () => {
@@ -59,15 +68,15 @@ describe("Staker dApp", () => {
 
   describe("Test stake() method", () => {
     it("Stake event emitted", async () => {
-      const amount = ethers.utils.parseEther("0.5");
+      const amount = ethers.utils.parseEther("3000");
 
       await expect(
-        stakerContract.connect(addr1).stake({
+        stakerContract.connect(whale).stake({
           value: amount,
         })
       )
         .to.emit(stakerContract, "Stake")
-        .withArgs(addr1.address, amount);
+        .withArgs(whale.address, amount);
 
       // Check that the contract has the correct amount of ETH we just sent
       const contractBalance = await ethers.provider.getBalance(
@@ -76,7 +85,7 @@ describe("Staker dApp", () => {
       expect(contractBalance).to.equal(amount);
 
       // Check that the contract has stored in our balances state the correct amount
-      const addr1Balance = await stakerContract.balances(addr1.address);
+      const addr1Balance = await stakerContract.balances(whale.address);
       expect(addr1Balance).to.equal(amount);
     });
 
